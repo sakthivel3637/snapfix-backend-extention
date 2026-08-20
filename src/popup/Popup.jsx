@@ -7,6 +7,7 @@ const Popup = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [projects, setProjects] = useState([]);
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [isTesting, setIsTesting] = useState(false);
@@ -73,6 +74,7 @@ const Popup = () => {
   const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
+    setIsLoggingIn(true);
     try {
       const response = await axios.post(
         "http://localhost:5000/api/auth/login",
@@ -85,9 +87,11 @@ const Popup = () => {
         setUser(newUser);
         axios.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
         fetchProjects();
+        setIsLoggingIn(false);
       });
     } catch (err) {
       setError(err.response?.data?.error || "Invalid credentials");
+      setIsLoggingIn(false);
     }
   };
 
@@ -100,7 +104,6 @@ const Popup = () => {
         setProjects([]);
         setIsTesting(false);
         setSelectedProjectId("");
-        // Stop testing in tab if active
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0]) {
             chrome.tabs.sendMessage(tabs[0].id, { type: "STOP_TESTING" });
@@ -119,7 +122,6 @@ const Popup = () => {
       { isTesting: true, selectedProject: selectedProjectId },
       () => {
         setIsTesting(true);
-        // Send message to content script, fallback to dynamic injection if the port isn't active
         chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
           if (tabs[0]) {
             chrome.tabs.sendMessage(
@@ -129,21 +131,19 @@ const Popup = () => {
                 projectId: selectedProjectId,
                 token: token,
               },
-              (response) => {
-                // If runtime.lastError is set, content script hasn't loaded yet on this tab
+              () => {
                 if (chrome.runtime.lastError) {
                   chrome.scripting.executeScript({
                     target: { tabId: tabs[0].id },
                     files: ["contentScript.js"]
                   }, () => {
-                    // Try sending the message again after script injection
                     setTimeout(() => {
                       chrome.tabs.sendMessage(tabs[0].id, {
                         type: "START_TESTING",
                         projectId: selectedProjectId,
                         token: token,
                       });
-                    }, 200);
+                    }, 100);
                   });
                 }
               }
@@ -157,7 +157,6 @@ const Popup = () => {
   const handleStopTesting = () => {
     chrome.storage.local.set({ isTesting: false }, () => {
       setIsTesting(false);
-      // Send message to content script
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         if (tabs[0]) {
           chrome.tabs.sendMessage(tabs[0].id, { type: "STOP_TESTING" });
@@ -172,6 +171,13 @@ const Popup = () => {
     p.name.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
+  const selectProject = (projectId) => {
+    setSelectedProjectId(projectId);
+    chrome.storage.local.set({ selectedProject: projectId });
+    setIsOpen(false);
+    setSearchQuery("");
+  };
+
   if (!token) {
     return (
       <div
@@ -183,6 +189,12 @@ const Popup = () => {
           boxSizing: "border-box",
         }}
       >
+        <style>{`
+          @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+        `}</style>
         <h3
           style={{
             color: "#c25845",
@@ -192,7 +204,7 @@ const Popup = () => {
             fontWeight: "bold",
           }}
         >
-          BugTracker Login
+          Snapfix Login
         </h3>
         {error && (
           <div
@@ -217,6 +229,7 @@ const Popup = () => {
             onChange={(e) => setEmail(e.target.value)}
             style={inputStyle}
             required
+            disabled={isLoggingIn}
           />
           <div style={{ position: "relative", width: "100%" }}>
             <input
@@ -226,10 +239,12 @@ const Popup = () => {
               onChange={(e) => setPassword(e.target.value)}
               style={{ ...inputStyle, paddingRight: "40px" }}
               required
+              disabled={isLoggingIn}
             />
             <button
               type="button"
               onClick={() => setShowPassword(!showPassword)}
+              disabled={isLoggingIn}
               style={{
                 position: "absolute",
                 right: "12px",
@@ -237,7 +252,7 @@ const Popup = () => {
                 transform: "translateY(-50%)",
                 background: "none",
                 border: "none",
-                cursor: "pointer",
+                cursor: isLoggingIn ? "not-allowed" : "pointer",
                 padding: "4px",
                 display: "flex",
                 alignItems: "center",
@@ -258,8 +273,52 @@ const Popup = () => {
               )}
             </button>
           </div>
-          <button type="submit" style={btnStyle}>
-            Login
+          <button
+            type="submit"
+            disabled={isLoggingIn}
+            style={{
+              ...btnStyle,
+              opacity: isLoggingIn ? 0.75 : 1,
+              cursor: isLoggingIn ? "not-allowed" : "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: "8px",
+            }}
+          >
+            {isLoggingIn ? (
+              <>
+                <svg
+                  style={{
+                    animation: "spin 0.8s linear infinite",
+                    width: "16px",
+                    height: "16px",
+                  }}
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeOpacity="0.25"
+                    strokeWidth="3"
+                  />
+                  <path
+                    d="M12 2a10 10 0 0 1 10 10"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                Logging in...
+              </>
+            ) : (
+              "Login"
+            )}
           </button>
         </form>
       </div>

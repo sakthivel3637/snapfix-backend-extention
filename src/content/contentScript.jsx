@@ -25,7 +25,7 @@ const initOverlay = (projectId, token) => {
   if (rootElement) return;
 
   rootElement = document.createElement('div');
-  rootElement.id = 'bugtracker-extension-root';
+  rootElement.id = 'snapfix-extension-root';
   rootElement.style.position = 'fixed';
   rootElement.style.top = '0';
   rootElement.style.left = '0';
@@ -40,6 +40,10 @@ const initOverlay = (projectId, token) => {
   // Inject shadow styles
   const style = document.createElement('style');
   style.textContent = `
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
     .hover-highlight {
       outline: 2px dashed #7c4dff !important;
       background-color: rgba(124, 77, 255, 0.05) !important;
@@ -139,6 +143,19 @@ const initOverlay = (projectId, token) => {
       border-radius: 6px;
       cursor: pointer;
       margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: background-color 0.2s, opacity 0.2s;
+    }
+    .btn-submit:hover:not(:disabled) {
+      background-color: #6a3de8;
+    }
+    .btn-submit:disabled {
+      opacity: 0.75;
+      cursor: not-allowed;
+      background-color: #5c3bbd;
     }
     .btn-cancel {
       width: 100%;
@@ -149,6 +166,11 @@ const initOverlay = (projectId, token) => {
       border-radius: 6px;
       cursor: pointer;
       margin-top: 5px;
+      transition: opacity 0.2s;
+    }
+    .btn-cancel:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
     .audio-section {
       border: 1px solid #374151;
@@ -631,6 +653,8 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
   const [steps, setSteps] = useState('');
   const [priority, setPriority] = useState('MEDIUM');
   const [labels, setLabels] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitStatusText, setSubmitStatusText] = useState('Submit Bug Report');
 
   // Audio recording
   const [recording, setRecording] = useState(false);
@@ -654,18 +678,18 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
     const handleMouseMove = (e) => {
       if (showModal || drawingMode) return;
       // Clear previous hover
-      document.querySelectorAll('.bugtracker-hover').forEach((el) => {
-        el.classList.remove('hover-highlight', 'bugtracker-hover');
+      document.querySelectorAll('.snapfix-hover').forEach((el) => {
+        el.classList.remove('hover-highlight', 'snapfix-hover');
       });
 
       // Highlight target element
       const target = e.target;
       if (
         target &&
-        target.id !== 'bugtracker-extension-root' &&
-        !target.closest('#bugtracker-extension-root')
+        target.id !== 'snapfix-extension-root' &&
+        !target.closest('#snapfix-extension-root')
       ) {
-        target.classList.add('hover-highlight', 'bugtracker-hover');
+        target.classList.add('hover-highlight', 'snapfix-hover');
       }
     };
 
@@ -675,15 +699,15 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
       const target = e.target;
       if (
         target &&
-        target.id !== 'bugtracker-extension-root' &&
-        !target.closest('#bugtracker-extension-root')
+        target.id !== 'snapfix-extension-root' &&
+        !target.closest('#snapfix-extension-root')
       ) {
         e.preventDefault();
         e.stopPropagation();
 
         // Remove highlights
-        document.querySelectorAll('.bugtracker-hover').forEach((el) => {
-          el.classList.remove('hover-highlight', 'bugtracker-hover');
+        document.querySelectorAll('.snapfix-hover').forEach((el) => {
+          el.classList.remove('hover-highlight', 'snapfix-hover');
         });
 
         // Capture coordinates relative to document scroll
@@ -791,12 +815,16 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
 
   const handleFormSubmit = async (e) => {
     e.preventDefault();
-    if (!title) return;
+    if (!title || isSubmitting) return;
+
+    setIsSubmitting(true);
+    setSubmitStatusText('Uploading screenshot...');
 
     try {
       // 1. Upload screenshot first
       let screenshotId = null;
       if (screenshotData) {
+        setSubmitStatusText('Uploading screenshot...');
         const screenshotBlob = await (await fetch(screenshotData)).blob();
         const screenshotFile = new File([screenshotBlob], 'screenshot.png', { type: 'image/png' });
         const sFormData = new FormData();
@@ -814,6 +842,7 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
       // 2. Upload voice recording if exists
       let voiceRecordingId = null;
       if (audioBlob) {
+        setSubmitStatusText('Uploading voice note...');
         const audioFile = new File([audioBlob], 'recording.webm', { type: 'audio/webm' });
         const aFormData = new FormData();
         aFormData.append('audio', audioFile);
@@ -831,6 +860,7 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
       // Upload video if exists
       let videoRecordingId = null;
       if (videoBlob) {
+        setSubmitStatusText('Uploading video recording...');
         const videoFile = new File([videoBlob], 'recording.webm', { type: 'video/webm' });
         const vFormData = new FormData();
         vFormData.append('video', videoFile);
@@ -848,7 +878,9 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
       // Upload video screenshots if exist
       const uploadedScreenshots = [];
       if (videoScreenshotsList.length > 0) {
-        for (const screenshot of videoScreenshotsList) {
+        for (let i = 0; i < videoScreenshotsList.length; i++) {
+          const screenshot = videoScreenshotsList[i];
+          setSubmitStatusText(`Uploading screenshot ${i + 1}/${videoScreenshotsList.length}...`);
           const sBlob = await (await fetch(screenshot.dataUrl)).blob();
           const sFile = new File([sBlob], `screenshot-${screenshot.timestamp}.png`, { type: 'image/png' });
           const sFormData = new FormData();
@@ -870,6 +902,7 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
       }
 
       // 3. Create feedback report
+      setSubmitStatusText('Saving report...');
       const labelsArray = labels ? labels.split(',').map((l) => l.trim()) : [];
       
       // Collect Environment details
@@ -878,13 +911,17 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
         if (userAgent.indexOf('Win') !== -1) return 'Windows';
         if (userAgent.indexOf('Mac') !== -1) return 'macOS';
         if (userAgent.indexOf('Linux') !== -1) return 'Linux';
+        if (userAgent.indexOf('Android') !== -1) return 'Android';
+        if (userAgent.indexOf('like Mac') !== -1) return 'iOS';
         return 'Unknown';
       };
 
       const getBrowser = () => {
-        if (userAgent.indexOf('Chrome') !== -1) return 'Chrome';
+        if (userAgent.indexOf('Chrome') !== -1 && userAgent.indexOf('Edg') === -1 && userAgent.indexOf('OPR') === -1) return 'Chrome';
+        if (userAgent.indexOf('Safari') !== -1 && userAgent.indexOf('Chrome') === -1) return 'Safari';
         if (userAgent.indexOf('Firefox') !== -1) return 'Firefox';
-        if (userAgent.indexOf('Safari') !== -1) return 'Safari';
+        if (userAgent.indexOf('Edg') !== -1) return 'Edge';
+        if (userAgent.indexOf('OPR') !== -1 || userAgent.indexOf('Opera') !== -1) return 'Opera';
         return 'Unknown';
       };
 
@@ -902,7 +939,7 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
         os: getOS(),
         viewportWidth: window.innerWidth,
         viewportHeight: window.innerHeight,
-        devicePixelRatio: window.devicePixelRatio,
+        devicePixelRatio: window.devicePixelRatio || 1,
         pinX: activePin.pinX,
         pinY: activePin.pinY,
         elementTag: activePin.tag,
@@ -928,10 +965,14 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
     } catch (err) {
       console.error(err);
       alert('Failed to submit feedback. Check server connection.');
+    } finally {
+      setIsSubmitting(false);
+      setSubmitStatusText('Submit Bug Report');
     }
   };
 
   const handleCancel = () => {
+    if (isSubmitting) return;
     setActivePin(null);
     setShowModal(false);
     setScreenshotData(null);
@@ -949,6 +990,8 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
     setSteps('');
     setLabels('');
     setDrawingRect(null);
+    setIsSubmitting(false);
+    setSubmitStatusText('Submit Bug Report');
   };
 
   return (
@@ -1189,7 +1232,7 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
               : { left: 'auto', right: '20px' }
           }
         >
-          <h3 style={{ margin: '0 0 15px 0', color: '#7c4dff' }}>New Bug Report</h3>
+          <h3 style={{ margin: '0 0 15px 0', color: '#7c4dff' }}>New Snapfix Report</h3>
 
           <form onSubmit={handleFormSubmit}>
             <div className="modal-body-scroll">
@@ -1359,10 +1402,47 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
             </div>
 
             <div className="modal-footer-fixed">
-              <button type="submit" className="btn-submit">
-                Submit Bug Report
+              <button type="submit" className="btn-submit" disabled={isSubmitting}>
+                {isSubmitting ? (
+                  <>
+                    <svg
+                      style={{
+                        animation: 'spin 0.8s linear infinite',
+                        width: '16px',
+                        height: '16px',
+                      }}
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeOpacity="0.25"
+                        strokeWidth="3"
+                      />
+                      <path
+                        d="M12 2a10 10 0 0 1 10 10"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <span>{submitStatusText}</span>
+                  </>
+                ) : (
+                  'Submit Bug Report'
+                )}
               </button>
-              <button type="button" className="btn-cancel" onClick={handleCancel}>
+              <button
+                type="button"
+                className="btn-cancel"
+                onClick={handleCancel}
+                disabled={isSubmitting}
+              >
                 Cancel
               </button>
             </div>

@@ -1,4 +1,4 @@
-console.log('BugTracker Background worker initialized.');
+console.log('Snapfix Background worker initialized.');
 
 // Listen for messages from content scripts or popups
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
