@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Visual Feedback & Bug Reporter",
+  "version": "1.0",
+  "description": "Report visual bugs directly to the dashboard from any web page.",
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "storage"
+  ],
+  "host_permissions": [
+    "http://localhost:5000/*",
+    "<all_urls>"
+  ],
+  "action": {
+    "default_popup": "index.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["contentScript.js"]
+    }
+  ]
+}
