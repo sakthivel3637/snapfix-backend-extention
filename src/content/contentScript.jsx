@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import ReactDOM from 'react-dom/client';
 import axios from 'axios';
+import { API_BASE_URL } from '../config';
 
 // Content script entry
 let rootElement = null;
@@ -830,7 +831,7 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
         const sFormData = new FormData();
         sFormData.append('screenshot', screenshotFile);
 
-        const sResponse = await axios.post('http://localhost:5000/api/uploads/screenshot', sFormData, {
+        const sResponse = await axios.post(`${API_BASE_URL}/api/uploads/screenshot`, sFormData, {
           headers: {
             'Content-Type': 'multipart/form-data',
             'Authorization': `Bearer ${token}`,
@@ -848,7 +849,7 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
         aFormData.append('audio', audioFile);
         aFormData.append('visibleTo', JSON.stringify(voiceVisibleTo));
 
-        const aResponse = await axios.post('http://localhost:5000/api/uploads/audio', aFormData, {
+        const aResponse = await axios.post(`${API_BASE_URL}/api/uploads/audio`, aFormData, {
           headers: {
             'Content-Type': 'multipart/form-data',
             'Authorization': `Bearer ${token}`,
@@ -866,7 +867,7 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
         vFormData.append('video', videoFile);
         vFormData.append('duration', recordingTime);
 
-        const vResponse = await axios.post('http://localhost:5000/api/uploads/video', vFormData, {
+        const vResponse = await axios.post(`${API_BASE_URL}/api/uploads/video`, vFormData, {
           headers: {
             'Content-Type': 'multipart/form-data',
             'Authorization': `Bearer ${token}`,
@@ -886,7 +887,7 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
           const sFormData = new FormData();
           sFormData.append('screenshot', sFile);
 
-          const sResponse = await axios.post('http://localhost:5000/api/uploads/screenshot', sFormData, {
+          const sResponse = await axios.post(`${API_BASE_URL}/api/uploads/screenshot`, sFormData, {
             headers: {
               'Content-Type': 'multipart/form-data',
               'Authorization': `Bearer ${token}`,
@@ -954,7 +955,7 @@ const OverlayUI = ({ projectId, token, shadowRoot }) => {
         labels: labelsArray,
       };
 
-      await axios.post('http://localhost:5000/api/feedback', payload, {
+      await axios.post(`${API_BASE_URL}/api/feedback`, payload, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },

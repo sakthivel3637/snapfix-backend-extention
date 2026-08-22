@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import { API_BASE_URL } from "../config";
 
 const Popup = () => {
   const [user, setUser] = useState(null);
@@ -56,7 +57,7 @@ const Popup = () => {
 
   const fetchProjects = async (savedProjectId) => {
     try {
-      const response = await axios.get("http://localhost:5000/api/projects");
+      const response = await axios.get(`${API_BASE_URL}/api/projects`);
       setProjects(response.data);
       if (response.data.length > 0) {
         const idToSelect =
@@ -77,7 +78,7 @@ const Popup = () => {
     setIsLoggingIn(true);
     try {
       const response = await axios.post(
-        "http://localhost:5000/api/auth/login",
+        `${API_BASE_URL}/api/auth/login`,
         { email, password },
       );
       const { token: newToken, user: newUser } = response.data;
